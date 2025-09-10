@@ -46,10 +46,10 @@ jobs:
 
       - name: Replace env vars in zappa_settings.json
         run: |
-          sed -i "s|\${MYSQL_HOST}|${{ secrets.MYSQL_HOST }}|g" zappa_settings.json
-          sed -i "s|\${MYSQL_USER}|${{ secrets.MYSQL_USER }}|g" zappa_settings.json
-          sed -i "s|\${MYSQL_PASSWORD}|${{ secrets.MYSQL_PASSWORD }}|g" zappa_settings.json
-          sed -i "s|\${MYSQL_DB}|${{ secrets.MYSQL_DB }}|g" zappa_settings.json
+          sed -i "s|\${MYSQL_HOST}|${{ secrets.MYSQL_HOST }}|g" lambda/zappa_settings.json
+          sed -i "s|\${MYSQL_USER}|${{ secrets.MYSQL_USER }}|g" lambda/zappa_settings.json
+          sed -i "s|\${MYSQL_PASSWORD}|${{ secrets.MYSQL_PASSWORD }}|g" lambda/zappa_settings.json
+          sed -i "s|\${MYSQL_DB}|${{ secrets.MYSQL_DB }}|g" lambda/zappa_settings.json
 
       - name: Deploy or update zappa  
         run: |
