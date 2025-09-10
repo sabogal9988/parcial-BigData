@@ -11,15 +11,12 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 1. Descarga el código fuente
       - uses: actions/checkout@v4
 
-      # 2. Instala Python
       - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
-      # 3. Crea entorno virtual e instala dependencias dentro de /lambda
       - name: Create venv & install deps (lambda/)
         working-directory: lambda
         run: |
@@ -29,8 +26,8 @@ jobs:
           pip install -r requirements.txt
           pip install "zappa==0.59.0"
 
-      # 4. Renderiza zappa_settings.json a partir de template usando los secrets
-      - name: Render zappa_settings.json from template with secrets
+      # Renderiza zappa_settings.json desde un string template embebido
+      - name: Render zappa_settings.json with secrets (inline)
         working-directory: lambda
         env:
           DATA_BUCKET: ${{ secrets.DATA_BUCKET }}
@@ -39,20 +36,31 @@ jobs:
           MYSQL_PASS:  ${{ secrets.MYSQL_PASS }}
           MYSQL_DB:    ${{ secrets.MYSQL_DB }}
         run: |
-          python - << 'PY'
-import os, sys
-src = "zappa_settings.template.json"
-dst = "zappa_settings.json"
-with open(src, "r", encoding="utf-8") as f:
-    s = f.read()
-for k in ("DATA_BUCKET","MYSQL_HOST","MYSQL_USER","MYSQL_PASS","MYSQL_DB"):
-    s = s.replace("${%s}"%k, os.environ[k])
-with open(dst, "w", encoding="utf-8") as f:
-    f.write(s)
-print("Rendered", dst)
-PY
+          python -c "
+          import os, json
+          tpl = {
+              'dev': {
+                  'aws_region': 'us-east-1',
+                  's3_bucket': os.environ['DATA_BUCKET'],
+                  'db_host': os.environ['MYSQL_HOST'],
+                  'db_user': os.environ['MYSQL_USER'],
+                  'db_pass': os.environ['MYSQL_PASS'],
+                  'db_name': os.environ['MYSQL_DB']
+              },
+              'dev2': {
+                  'aws_region': 'us-east-1',
+                  's3_bucket': os.environ['DATA_BUCKET'],
+                  'db_host': os.environ['MYSQL_HOST'],
+                  'db_user': os.environ['MYSQL_USER'],
+                  'db_pass': os.environ['MYSQL_PASS'],
+                  'db_name': os.environ['MYSQL_DB']
+              }
+          }
+          with open('zappa_settings.json','w',encoding='utf-8') as f:
+              json.dump(tpl, f, indent=2)
+          print('Rendered zappa_settings.json')
+          "
 
-      # 5. Configura AWS credentials (necesario para Zappa)
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -61,7 +69,6 @@ PY
           aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
 
-      # 6. Zappa deploy/update para stage 'dev'
       - name: Deploy/Update stage dev (downloader)
         working-directory: lambda
         run: |
@@ -72,7 +79,6 @@ PY
             zappa deploy dev
           fi
 
-      # 7. Zappa deploy/update para stage 'dev2'
       - name: Deploy/Update stage dev2 (ingestor)
         working-directory: lambda
         run: |
