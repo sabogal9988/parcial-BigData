@@ -1,90 +1,73 @@
+# This is a basic workflow to help you get started with Actions
+
 name: CI
 
+# Controls when the workflow will run
 on:
+  # Triggers the workflow on push or pull request events but only for the "main" branch
   push:
-    branches: ["main"]
+    branches: [ "main" ]
   pull_request:
-    branches: ["main"]
+    branches: [ "main" ]
+
+  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
+  # This workflow contains a single job called "build"
   build:
+    # The type of runner that the job will run on
     runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.10"
+          python-version: '3.13'
 
-      - name: Create venv & install deps (lambda/)
-        working-directory: lambda
+      # Runs a set of commands using the runners shell
+      - name: Install python requirements.txt
         run: |
           python -m venv env
           source env/bin/activate
-          pip install --upgrade pip
           pip install -r requirements.txt
-          pip install "zappa==0.59.0"
 
-      # Renderiza zappa_settings.json desde un string template embebido
-      - name: Render zappa_settings.json with secrets (inline)
-        working-directory: lambda
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Prepare zappa_settings.json
         env:
           DATA_BUCKET: ${{ secrets.DATA_BUCKET }}
           MYSQL_HOST:  ${{ secrets.MYSQL_HOST }}
           MYSQL_USER:  ${{ secrets.MYSQL_USER }}
           MYSQL_PASS:  ${{ secrets.MYSQL_PASS }}
-          MYSQL_DB:    ${{ secrets.MYSQL_DB }}
+          MYSQL_NAME:  ${{ secrets.MYSQL_NAME }}
         run: |
-          python -c "
-          import os, json
-          tpl = {
-              'dev': {
-                  'aws_region': 'us-east-1',
-                  's3_bucket': os.environ['DATA_BUCKET'],
-                  'db_host': os.environ['MYSQL_HOST'],
-                  'db_user': os.environ['MYSQL_USER'],
-                  'db_pass': os.environ['MYSQL_PASS'],
-                  'db_name': os.environ['MYSQL_DB']
-              },
-              'dev2': {
-                  'aws_region': 'us-east-1',
-                  's3_bucket': os.environ['DATA_BUCKET'],
-                  'db_host': os.environ['MYSQL_HOST'],
-                  'db_user': os.environ['MYSQL_USER'],
-                  'db_pass': os.environ['MYSQL_PASS'],
-                  'db_name': os.environ['MYSQL_DB']
-              }
-          }
-          with open('zappa_settings.json','w',encoding='utf-8') as f:
-              json.dump(tpl, f, indent=2)
-          print('Rendered zappa_settings.json')
-          "
+          envsubst < zappa_settings.template.json > zappa_settings.json
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: us-east-1
-
-      - name: Deploy/Update stage dev (downloader)
-        working-directory: lambda
+      - name: Deploy or update zappa  
         run: |
           source env/bin/activate
-          if zappa status dev >/dev/null 2>&1; then
+          if zappa status dev; then
             zappa update dev
           else
             zappa deploy dev
           fi
 
-      - name: Deploy/Update stage dev2 (ingestor)
-        working-directory: lambda
+      - name: Subir rs
         run: |
           source env/bin/activate
-          if zappa status dev2 >/dev/null 2>&1; then
-            zappa update dev2
+          if zappa status dev; then
+            zappa update dev
           else
-            zappa deploy dev2
+            zappa deploy dev
           fi
