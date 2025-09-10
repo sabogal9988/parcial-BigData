@@ -44,15 +44,12 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
 
-      - name: Prepare zappa_settings.json
-        env:
-          DATA_BUCKET: ${{ secrets.DATA_BUCKET }}
-          MYSQL_HOST:  ${{ secrets.MYSQL_HOST }}
-          MYSQL_USER:  ${{ secrets.MYSQL_USER }}
-          MYSQL_PASS:  ${{ secrets.MYSQL_PASS }}
-          MYSQL_NAME:  ${{ secrets.MYSQL_NAME }}
+      - name: Replace env vars in zappa_settings.json
         run: |
-          envsubst < zappa_settings.template.json > zappa_settings.json
+          sed -i "s|\${MYSQL_HOST}|${{ secrets.MYSQL_HOST }}|g" zappa_settings.json
+          sed -i "s|\${MYSQL_USER}|${{ secrets.MYSQL_USER }}|g" zappa_settings.json
+          sed -i "s|\${MYSQL_PASSWORD}|${{ secrets.MYSQL_PASSWORD }}|g" zappa_settings.json
+          sed -i "s|\${MYSQL_DB}|${{ secrets.MYSQL_DB }}|g" zappa_settings.json
 
       - name: Deploy or update zappa  
         run: |
