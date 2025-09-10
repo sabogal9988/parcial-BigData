@@ -9,38 +9,52 @@ logger.setLevel(logging.INFO)
 s3 = boto3.client("s3")
 TABLE = "dolar"  # sin tilde
 
+
 def _read_env():
     """
-    Lee y valida env vars. Chequea placeholders solo en valores string
-    y convierte el puerto a int al final.
+    Lee y valida env vars. Chequea placeholders solo en strings
+    y convierte el puerto a int al final. Acepta alias DB_* / MYSQL_NAME.
     """
-    req = ["MYSQL_HOST", "MYSQL_USER", "MYSQL_PASS", "MYSQL_DB"]
-    env = {k: (os.environ.get(k) or "").strip() for k in req}
-    port_raw = (os.environ.get("MYSQL_PORT") or "3306").strip() or "3306"
+    def first(*keys, default=""):
+        for k in keys:
+            v = os.environ.get(k)
+            if v is not None and str(v).strip():
+                return str(v).strip()
+        return default
+
+    host = first("MYSQL_HOST", "DB_HOST")
+    user = first("MYSQL_USER", "DB_USER")
+    passwd = first("MYSQL_PASS", "DB_PASS")
+    dbname = first("MYSQL_DB", "MYSQL_NAME", "DB_NAME")
+    port_raw = first("MYSQL_PORT", "DB_PORT", default="3306") or "3306"
 
     # Log seguro (enmascara pass)
-    safe = env.copy()
-    if safe.get("MYSQL_PASS"):
-        safe["MYSQL_PASS"] = "***" + safe["MYSQL_PASS"][-2:]
+    safe_pass = "***" + passwd[-2:] if passwd else ""
     logger.info("[ENV] host=%s user=%s db=%s port=%s pass=%s",
-                safe.get("MYSQL_HOST"), safe.get("MYSQL_USER"),
-                safe.get("MYSQL_DB"), port_raw, safe.get("MYSQL_PASS"))
+                host, user, dbname, port_raw, safe_pass)
 
-    missing = [k for k, v in env.items() if not v]
+    # Validaciones
+    missing = [k for k, v in {
+        "host": host, "user": user, "passwd": passwd, "dbname": dbname
+    }.items() if not v]
     if missing:
         raise RuntimeError(f"ENV faltantes: {missing}")
 
-    # Solo chequear placeholders en strings
-    placeholders = [k for k, v in env.items() if v.startswith("${") and v.endswith("}")]
+    # Detecta placeholders tipo ${VAR}
+    placeholders = []
+    for name, val in [("host", host), ("user", user), ("passwd", passwd), ("dbname", dbname), ("port", port_raw)]:
+        if isinstance(val, str) and val.startswith("${") and val.endswith("}"):
+            placeholders.append(name)
     if placeholders:
         raise RuntimeError(f"ENV con placeholders sin reemplazar: {placeholders}")
 
     try:
         port = int(port_raw)
     except ValueError:
-        raise RuntimeError(f"MYSQL_PORT inválido: {port_raw}")
+        raise RuntimeError(f"MYSQL_PORT / DB_PORT inválido: {port_raw}")
 
-    return env["MYSQL_HOST"], env["MYSQL_USER"], env["MYSQL_PASS"], env["MYSQL_DB"], port
+    return host, user, passwd, dbname, port
+
 
 def handler(event, context):
     try:
@@ -72,7 +86,7 @@ def handler(event, context):
             key = rec["s3"]["object"]["key"]
             logger.info("[S3] (%d/%d) s3://%s/%s", i, len(records), bucket, key)
 
-            # 👇 Evita procesar artefactos de Zappa u otros archivos
+            # Evita procesar artefactos de Zappa u otros archivos
             if not (key.startswith("dolar-") and key.endswith(".json")):
                 logger.info("[SKIP] Key no coincide con dolar-*.json: %s", key)
                 continue
