@@ -54,6 +54,7 @@ jobs:
       - name: Deploy or update zappa  
         run: |
           source env/bin/activate
+          cd lambda/
           if zappa status dev; then
             zappa update dev
           else
@@ -63,8 +64,9 @@ jobs:
       - name: Subir rs
         run: |
           source env/bin/activate
-          if zappa status dev; then
-            zappa update dev
+          cd lambda/
+          if zappa status dev2; then
+            zappa update dev2
           else
-            zappa deploy dev
+            zappa deploy dev2
           fi

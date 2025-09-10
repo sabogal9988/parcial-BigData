@@ -25,7 +25,7 @@
     ]
     
     },
-    ,
+    
      "dev2": {
         "app_function": "subirDB.handler",
         "aws_region": "us-east-1",
