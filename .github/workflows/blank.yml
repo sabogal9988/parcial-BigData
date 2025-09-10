@@ -31,7 +31,7 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
 
-      - name: Prepare zappa_settings.json
+      - name: Prepare lambda/zappa_settings.json
         env:
           DATA_BUCKET: ${{ secrets.DATA_BUCKET }}
           MYSQL_HOST:  ${{ secrets.MYSQL_HOST }}
@@ -39,22 +39,22 @@ jobs:
           MYSQL_PASS:  ${{ secrets.MYSQL_PASS }}
           MYSQL_NAME:  ${{ secrets.MYSQL_NAME }}
         run: |
-          envsubst < zappa_settings.template.json > zappa_settings.json
+          envsubst < lambda/zappa_settings.template.json > lambda/zappa_settings.json
 
       - name: Deploy or update zappa  
         run: |
           source env/bin/activate
-          if zappa status dev; then
-            zappa update dev
+          if zappa status dev -s lambda/zappa_settings.json; then
+            zappa update dev -s lambda/zappa_settings.json
           else
-            zappa deploy dev
+            zappa deploy dev -s lambda/zappa_settings.json
           fi
 
       - name: Subir rs
         run: |
           source env/bin/activate
-          if zappa status dev; then
-            zappa update dev
+          if zappa status dev -s lambda/zappa_settings.json; then
+            zappa update dev -s lambda/zappa_settings.json
           else
-            zappa deploy dev
+            zappa deploy dev -s lambda/zappa_settings.json
           fi
