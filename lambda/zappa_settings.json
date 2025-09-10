@@ -1,0 +1,67 @@
+{
+    "dev": {
+        "app_function": "app.handler",
+        "aws_region": "us-east-1",
+        "exclude": [
+            "boto3",
+            "dateutil",
+            "botocore",
+            "s3transfer",
+            "concurrent"
+        ],
+        "project_name": "lambda",
+        "runtime": "python3.9",
+        "s3_bucket": "dolar-raw-sebastian-10347",
+        "keep_warm": false,
+        "apigateway_enabled": false,
+        "manage_roles": false,
+        "role_name": "LabRole",
+        
+        "events": [
+      {
+        "function": "app.handler",
+        "expression": "cron(0 23 ? * * *)"
+      }
+    ]
+    
+    },
+    ,
+     "dev2": {
+        "app_function": "subirDB.handler",
+        "aws_region": "us-east-1",
+        "exclude": [
+            "boto3",
+            "dateutil",
+            "botocore",
+            "s3transfer",
+            "concurrent"
+        ],
+        "project_name": "lambda",
+        "runtime": "python3.9",
+        "s3_bucket": "dolar-raw-sebastian-10347",
+        "keep_warm": false,
+        "apigateway_enabled": false,
+        "manage_roles": false,
+        "role_name": "LabRole",
+        
+        "environment_variables": {
+            "MYSQL_HOST": "${MYSQL_HOST}",
+            "MYSQL_USER": "${MYSQL_USER}",
+            "MYSQL_PASS": "${MYSQL_PASS}",
+            "MYSQL_DB": "${MYSQL_DB}"
+        },
+        "events": [
+            {
+                "function": "subirDB.handler",
+                "event_source": {
+                    "arn": "arn:aws:s3:::dolar-raw-sebastian-10347",
+                    "events": ["s3:ObjectCreated:*"]
+                    
+                }
+            }
+
+    ]
+    }
+}
+
+
