@@ -71,3 +71,25 @@ jobs:
           else
             zappa deploy dev2
           fi
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/app
+            git pull origin main
+            source venv/bin/activate
+            pip install -r requirements.txt
+
+            # Crear/actualizar archivo .env con los secrets
+            cat > /home/ubuntu/app/.env <<EOF
+            MYSQL_HOST=${{ secrets.MYSQL_HOST }}
+            MYSQL_USER=${{ secrets.MYSQL_USER }}
+            MYSQL_PASS=${{ secrets.MYSQL_PASS }}
+            MYSQL_DB=${{ secrets.MYSQL_DB }}
+            EOF
+
+            # Reiniciar servicio systemd
+            sudo systemctl restart api
