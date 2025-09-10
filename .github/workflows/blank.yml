@@ -2,59 +2,83 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      # 1. Descarga el código fuente
       - uses: actions/checkout@v4
 
+      # 2. Instala Python
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.13'
+          python-version: "3.10"
 
-      - name: Install python requirements (lambda/requirements.txt)
+      # 3. Crea entorno virtual e instala dependencias dentro de /lambda
+      - name: Create venv & install deps (lambda/)
+        working-directory: lambda
         run: |
           python -m venv env
           source env/bin/activate
-          pip install -r lambda/requirements.txt
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install "zappa==0.59.0"
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: us-east-1
-
-      - name: Prepare lambda/zappa_settings.json
+      # 4. Renderiza zappa_settings.json a partir de template usando los secrets
+      - name: Render zappa_settings.json from template with secrets
+        working-directory: lambda
         env:
           DATA_BUCKET: ${{ secrets.DATA_BUCKET }}
           MYSQL_HOST:  ${{ secrets.MYSQL_HOST }}
           MYSQL_USER:  ${{ secrets.MYSQL_USER }}
           MYSQL_PASS:  ${{ secrets.MYSQL_PASS }}
-          MYSQL_NAME:  ${{ secrets.MYSQL_NAME }}
+          MYSQL_DB:    ${{ secrets.MYSQL_DB }}
         run: |
-          envsubst < lambda/zappa_settings.template.json > lambda/zappa_settings.json
+          python - << 'PY'
+import os, sys
+src = "zappa_settings.template.json"
+dst = "zappa_settings.json"
+with open(src, "r", encoding="utf-8") as f:
+    s = f.read()
+for k in ("DATA_BUCKET","MYSQL_HOST","MYSQL_USER","MYSQL_PASS","MYSQL_DB"):
+    s = s.replace("${%s}"%k, os.environ[k])
+with open(dst, "w", encoding="utf-8") as f:
+    f.write(s)
+print("Rendered", dst)
+PY
 
-      - name: Deploy or update zappa  
+      # 5. Configura AWS credentials (necesario para Zappa)
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token:     ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      # 6. Zappa deploy/update para stage 'dev'
+      - name: Deploy/Update stage dev (downloader)
+        working-directory: lambda
         run: |
           source env/bin/activate
-          if zappa status dev -s lambda/zappa_settings.json; then
-            zappa update dev -s lambda/zappa_settings.json
+          if zappa status dev >/dev/null 2>&1; then
+            zappa update dev
           else
-            zappa deploy dev -s lambda/zappa_settings.json
+            zappa deploy dev
           fi
 
-      - name: Subir rs
+      # 7. Zappa deploy/update para stage 'dev2'
+      - name: Deploy/Update stage dev2 (ingestor)
+        working-directory: lambda
         run: |
           source env/bin/activate
-          if zappa status dev -s lambda/zappa_settings.json; then
-            zappa update dev -s lambda/zappa_settings.json
+          if zappa status dev2 >/dev/null 2>&1; then
+            zappa update dev2
           else
-            zappa deploy dev -s lambda/zappa_settings.json
+            zappa deploy dev2
           fi
