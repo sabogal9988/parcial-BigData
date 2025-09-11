@@ -28,7 +28,7 @@ jobs:
       - name: Run unit tests
         run: |
           source env/bin/activate
-          pytest -q --maxfail=1 --disable-warnings
+          pytest ./tests/tests.py
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
