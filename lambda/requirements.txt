@@ -67,3 +67,4 @@ requests-mock
 freezegun
 fastapi
 httpx
+pytest
