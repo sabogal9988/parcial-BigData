@@ -20,6 +20,15 @@ class FakeCursor:
         self._rows = rows or []
         self.closed = False
 
+    # --- context manager support ---
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.close()
+        # no suprimir excepciones
+        return False
+
     def execute(self, sql, params=None):
         self.executed.append((sql, params))
 
@@ -41,14 +50,16 @@ class FakeConn:
     def cursor(self):
         return self.cursor_obj
 
-    def close(self):
-        self.closed = True
-
+    # --- context manager support ---
     def __enter__(self):
         return self
 
     def __exit__(self, exc_type, exc, tb):
         self.close()
+        return False
+
+    def close(self):
+        self.closed = True
 
 
 # ============================================================
