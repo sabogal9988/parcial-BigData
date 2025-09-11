@@ -34,6 +34,7 @@ class IntervalResponse(BaseModel):
     data: List[Point]
 
 # ---------- App ----------
+# ---------- App ----------
 app = FastAPI(title="Dolar API", version="1.0.0")
 
 def get_conn():
@@ -57,6 +58,11 @@ def get_conn():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+# 🚀 Nuevo endpoint
+@app.get("/hola")
+def hola_bigdata():
+    return {"message": "hola bigdata"}
 
 @app.post("/api/v1/dolar/intervalo", response_model=IntervalResponse)
 def query_interval(payload: IntervalRequest):
