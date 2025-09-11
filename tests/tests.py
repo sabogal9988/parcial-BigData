@@ -142,17 +142,23 @@ def test_subirdb_read_env_bad_port(monkeypatch):
 
 @mock_aws
 def test_subirdb_handler_happy_path(monkeypatch):
-    sub_mod = importlib.import_module("lambda.subirDB")
+    import importlib
 
-    # AWS fake
+    # 1) AWS fake/creds antes de importar el módulo
     os.environ.setdefault("AWS_ACCESS_KEY_ID", "testing")
     os.environ.setdefault("AWS_SECRET_ACCESS_KEY", "testing")
     os.environ.setdefault("AWS_DEFAULT_REGION", "us-east-1")
+
+    # 2) Cliente S3 de moto y bucket
     s3 = boto3.client("s3", region_name="us-east-1")
     bucket = "dolar-raw-test2"
     s3.create_bucket(Bucket=bucket)
 
-    # JSON de entrada (lista de [epoch_ms, valor])
+    # 3) Importa el módulo y parchea su cliente s3 por el de moto
+    sub_mod = importlib.import_module("lambda.subirDB")
+    monkeypatch.setattr(sub_mod, "s3", s3)
+
+    # 4) Sube objeto de prueba
     data = [
         ["1757509256000", "3920.00"],
         ["1757509266000", "3921.50"],
@@ -163,39 +169,41 @@ def test_subirdb_handler_happy_path(monkeypatch):
         Body=json.dumps(data).encode("utf-8"),
         ContentType="application/json",
     )
-    event = {"Records": [
-        {"s3": {"bucket": {"name": bucket}, "object": {"key": "dolar-123.json"}}},
-        {"s3": {"bucket": {"name": bucket}, "object": {"key": "otro.txt"}}},
-    ]}
 
-    # ENV DB
+    event = {
+        "Records": [
+            {"s3": {"bucket": {"name": bucket}, "object": {"key": "dolar-123.json"}}},
+            {"s3": {"bucket": {"name": bucket}, "object": {"key": "otro.txt"}}},
+        ]
+    }
+
+    # 5) ENV DB
     monkeypatch.setenv("MYSQL_HOST", "localhost")
     monkeypatch.setenv("MYSQL_USER", "root")
     monkeypatch.setenv("MYSQL_PASS", "secret")
     monkeypatch.setenv("MYSQL_DB", "db")
     monkeypatch.setenv("MYSQL_PORT", "3306")
 
-    # Fake pymysql.connect
+    # 6) Fake pymysql.connect
     fake_conn = FakeConn()
     monkeypatch.setattr(sub_mod.pymysql, "connect", lambda **kwargs: fake_conn)
 
+    # 7) Ejecutar
     res = sub_mod.handler(event, {})
 
+    # 8) Asserts
     assert res["files_processed"] == 1
     assert res["total_rows_inserted"] == 2
-
-    # Validar que se creó tabla y se hizo INSERT masivo
     executed = "".join(sql for sql, _ in fake_conn.cursor_obj.executed)
     assert "CREATE TABLE IF NOT EXISTS dolar" in executed
     assert len(fake_conn.cursor_obj.executemany_calls) == 1
-
     insert_sql, rows = fake_conn.cursor_obj.executemany_calls[0]
     assert "INSERT INTO dolar (fechahora, valor)" in insert_sql
 
-    # Calcular expectativas con la misma lógica del código (naive localtime)
     ts1 = datetime.fromtimestamp(int(data[0][0]) / 1000).strftime("%Y-%m-%d %H:%M:%S")
     ts2 = datetime.fromtimestamp(int(data[1][0]) / 1000).strftime("%Y-%m-%d %H:%M:%S")
     assert rows == [(ts1, 3920.0), (ts2, 3921.5)]
+
 
 
 # ============================================================
