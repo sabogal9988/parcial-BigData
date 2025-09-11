@@ -7,9 +7,21 @@ import pymysql
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+# --- Cargar .env (usa ruta explícita si quieres) ---
+try:
+    from dotenv import load_dotenv
+    # 1) si defines ENV_FILE en systemd, úsalo; 2) si no, intenta /opt/dolar-api/.env; 3) cae a ./.env
+    env_file = os.environ.get("ENV_FILE") or "/home/ubuntu/parcial-BigData/.env"
+    if not os.path.isfile(env_file):
+        env_file = ".env"
+    load_dotenv(env_file)
+except Exception:
+    # si no está instalado python-dotenv, simplemente continúa;
+    # las vars pueden venir de systemd EnvironmentFile o del shell
+    pass
+
 # ---------- Modelos ----------
 class IntervalRequest(BaseModel):
-    # Acepta "YYYY-MM-DD HH:MM:SS" o ISO "YYYY-MM-DDTHH:MM:SS"
     start: datetime
     end: datetime
 
@@ -48,11 +60,9 @@ def health():
 
 @app.post("/api/v1/dolar/intervalo", response_model=IntervalResponse)
 def query_interval(payload: IntervalRequest):
-    # Validación simple
     if payload.end <= payload.start:
         raise HTTPException(status_code=400, detail="`end` debe ser mayor que `start`.")
 
-    # Normaliza a cadena para MySQL DATETIME
     start_str = payload.start.strftime("%Y-%m-%d %H:%M:%S")
     end_str   = payload.end.strftime("%Y-%m-%d %H:%M:%S")
 
