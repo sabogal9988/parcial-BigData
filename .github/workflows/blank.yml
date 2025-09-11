@@ -26,12 +26,6 @@ jobs:
           source env/bin/activate
           pip install -r lambda/requirements.txt
 
-      # === NUEVO: dependencias de test ===
-      - name: Install test dependencies
-        run: |
-          source env/bin/activate
-          pip install pytest moto[boto3] requests-mock freezegun "httpx<0.28>"
-
       # === NUEVO: correr tests ===
       - name: Run unit tests
         run: |
