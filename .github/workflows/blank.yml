@@ -80,7 +80,7 @@ jobs:
           script: |
             cd /home/ubuntu/parcial-BigData
             git pull origin main
-            source venv/bin/activate
+            source .venv/bin/activate
             pip install -r lambda/requirements.txt
 
             # Crear/actualizar archivo .env con los secrets
